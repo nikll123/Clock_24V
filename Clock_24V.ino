@@ -1,4 +1,6 @@
 /* Программа управления настенными часами, предназначенными для работы с часовым сервером на основе модуля DS1302 и подобным*/
+// Теперь не читаем время с модуля каждую секунду. При запуске читаем время, далее работа по внутреннему таймеру
+// Присоединён дисплей, сделан вывод времени на дисплей
 // в процессе менюшка с переводом времени
 #include <EEPROM.h>
 #include <iarduino_RTC.h>
@@ -41,7 +43,7 @@ void setup() {
     time.hours = 0;
 
   I2C_lcdStart();
-//  lcd.begin (16, 2);
+  //  lcd.begin (16, 2);
 
   pinMode (OUT1, OUTPUT);
   pinMode (OUT2, OUTPUT);
@@ -75,48 +77,47 @@ void loop() {
       }
     }
   }
-  if ( (time.hours != clock_h || time.minutes != clock_m) && (map ( (analogRead (VOLT_PIN) / 4), 0, 255, 0, 24) ) > 19) {
+
+  if (map ( (analogRead (VOLT_PIN) / 4), 0, 255, 0, 24) > 19) {
+    if  (time.hours != clock_h || time.minutes != clock_m)  {
     digitalWrite (LED_PIN, LOW);
-    clock_m ++;
-    if (clock_m == 60) {
-      clock_m = 0;
-      clock_h ++;
-      if (clock_h == 12)
-        clock_h = 0;
+      clock_m ++;
+      if (clock_m == 60) {
+        clock_m = 0;
+        clock_h ++;
+        if (clock_h == 12)
+          clock_h = 0;
+      }
+      EEPROM.put (MIN_ADD, clock_m);
+      EEPROM.put (HOUR_ADD, clock_h);
+      clockSwitch (clock_m);
     }
-    EEPROM.put (MIN_ADD, clock_m);
-    EEPROM.put (HOUR_ADD, clock_h);
-    clockSwitch (clock_m);
   }
-  else if ( (map ( (analogRead (VOLT_PIN) / 4), 0, 255, 0, 24) ) <= 19)
+  else
     digitalWrite (LED_PIN, HIGH);
-}
+  }
 
 void clockSwitch (byte minutes) {
-  if (minutes%2 == 0) {
-    digitalWrite (OUT1, HIGH);
-    digitalWrite (LED_PIN, HIGH);
-    delay (100);
-    digitalWrite (OUT1, LOW);
-    digitalWrite (LED_PIN, LOW);
-    delay (100);
-  }
-  else {
-    digitalWrite (OUT2, HIGH);
-    digitalWrite (LED_PIN, HIGH);
-    delay (100);
-    digitalWrite (OUT2, LOW);
-    digitalWrite (LED_PIN, LOW);
-    delay (100);
-  }
+  byte _pin;
+  if (minutes % 2 == 0) 
+    _pin = OUT1;
+  else
+    _pin = OUT2;
+    
+  digitalWrite (_pin, HIGH);
+  digitalWrite (LED_PIN, HIGH);
+  delay (100);
+  digitalWrite (_pin, LOW);
+  digitalWrite (LED_PIN, LOW);
+  delay (100);
 }
 
 /*
-void lcdClear() {
+  void lcdClear() {
   lcd.clear();
   lcd.noBlink();
   lcd.setCursor (0, 0);
-}
+  }
 */
 
 void I2C_lcdStart() {
@@ -142,11 +143,12 @@ void print_time (byte _symb, byte _line, byte _hour, byte _min) {
   lcd.print (_min);
 }
 
+/*
 void checkButton() {
   byte buttonCurrent = analogRead(BTN_PIN) / 4;
   if (buttonCurrent > 250)
     buttonPrev = buttonCurrent;
-//NONE = 255, SELECT = 160, LEFT = 103, DOWN = 64, UP = 25, RIGHT = 0
+  //NONE = 255, SELECT = 160, LEFT = 103, DOWN = 64, UP = 25, RIGHT = 0
   else if (buttonCurrent < 250 && buttonPrev > 250) {
     buttonTime = millis();
     buttonPrev = buttonCurrent;
@@ -162,3 +164,4 @@ void checkButton() {
       buttonAction = RIGHT;
   }
 }
+*/
