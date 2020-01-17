@@ -22,17 +22,19 @@
 #define BTN2_PIN 15  //A1
 #define BTN3_PIN 16  //A2
 
-#define VOLT_PIN A1
+#define VOLT_PIN A1                                            //sensor pin for power voltage control
 
-iarduino_RTC time (RTC_DS1302, 0, 1, 2);                       //RST, CLK, DAT
-//LiquidCrystal lcd (8, 9, 4, 5, 6, 7);                        //для display shield: RS, E, D4, D5, D6, D7, R/W = GND
-LiquidCrystal_I2C lcd(0x3f, 16, 2);                            //устанавливаем адрес 0x3f, дисплей 16 символов в 2 строки (16х2)
+//iarduino_RTC time (RTC_DS1302, 0, 1, 2);                     //RST, CLK, DAT
+//iarduino_RTC time (RTC_DS1307);                              //using I2C
+iarduino_RTC time (RTC_DS3231);                                //using I2C
+//LiquidCrystal lcd (8, 9, 4, 5, 6, 7);                        //for display shield: RS, E, D4, D5, D6, D7, R/W = GND
+LiquidCrystal_I2C lcd(0x3f, 16, 2);                            //Set address 0x3f, display 16 symbols and 2 lines (16х2)
 
 byte out1pin = 16;     //A2
 byte out2pin = 17;     //A3
 byte clock_h = 0;
 byte clock_m = 0;
-unsigned long millisPrev = 1000;    // таймер секунд
+unsigned long millisPrev = 1000;    // seconds timer
 unsigned long buttonTime = 0;
 byte buttonAction = NONE;
 
