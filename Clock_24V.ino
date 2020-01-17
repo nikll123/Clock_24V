@@ -15,20 +15,20 @@
 #define NONE 0
 #define SELECT 1
 #define LEFT 2
-#define DOWN 3
-#define UP 4
-#define RIGHT 5
+#define RIGHT 3
 
-#define OUT1 16     //A2
-#define OUT2 17     //A3
-#define BTN_PIN 14  //A0
-#define LED_PIN 13
+#define BTN1_PIN 14  //A0
+#define BTN2_PIN 15  //A1
+#define BTN3_PIN 16  //A2
+
 #define VOLT_PIN A1
 
 iarduino_RTC time (RTC_DS1302, 0, 1, 2);                       //RST, CLK, DAT
 //LiquidCrystal lcd (8, 9, 4, 5, 6, 7);                        //для display shield: RS, E, D4, D5, D6, D7, R/W = GND
 LiquidCrystal_I2C lcd(0x3f, 16, 2);                            //устанавливаем адрес 0x3f, дисплей 16 символов в 2 строки (16х2)
 
+byte out1pin = 16;     //A2
+byte out2pin = 17;     //A3
 byte clock_h = 0;
 byte clock_m = 0;
 unsigned long millisPrev = 1000;    // таймер секунд
@@ -45,11 +45,11 @@ void setup() {
   I2C_lcdStart();
   //  lcd.begin (16, 2);
 
-  pinMode (OUT1, OUTPUT);
-  pinMode (OUT2, OUTPUT);
+  pinMode (out1pin, OUTPUT);
+  pinMode (out2pin, OUTPUT);
   pinMode (BTN_PIN, INPUT);
   pinMode (VOLT_PIN, INPUT);
-  pinMode (LED_PIN, OUTPUT);
+  pinMode (LED_BUILTIN, OUTPUT);
   if (EEPROM.get (HOUR_ADD, clock_h) == 255) {
     EEPROM.put (HOUR_ADD, 4);
     EEPROM.put (MIN_ADD, 37);
@@ -80,7 +80,7 @@ void loop() {
 
   if (map ( (analogRead (VOLT_PIN) / 4), 0, 255, 0, 24) > 19) {
     if  (time.hours != clock_h || time.minutes != clock_m)  {
-    digitalWrite (LED_PIN, LOW);
+    digitalWrite (LED_BUILTIN, LOW);
       clock_m ++;
       if (clock_m == 60) {
         clock_m = 0;
@@ -94,31 +94,27 @@ void loop() {
     }
   }
   else
-    digitalWrite (LED_PIN, HIGH);
+    digitalWrite (LED_BUILTIN, HIGH);
   }
 
 void clockSwitch (byte minutes) {
   byte _pin;
-  if (minutes % 2 == 0) 
-    _pin = OUT1;
+  if (minutes & 1) 
+    _pin = out1pin;
   else
-    _pin = OUT2;
+    _pin = out2pin;
     
   digitalWrite (_pin, HIGH);
-  digitalWrite (LED_PIN, HIGH);
+  digitalWrite (LED_BUILTIN, HIGH);
   delay (100);
   digitalWrite (_pin, LOW);
-  digitalWrite (LED_PIN, LOW);
+  digitalWrite (LED_BUILTIN, LOW);
   delay (100);
 }
 
-/*
-  void lcdClear() {
-  lcd.clear();
-  lcd.noBlink();
-  lcd.setCursor (0, 0);
-  }
-*/
+void formatTime () {
+  
+}
 
 void I2C_lcdStart() {
   lcd.init();                     // инициализация LCD
@@ -143,25 +139,8 @@ void print_time (byte _symb, byte _line, byte _hour, byte _min) {
   lcd.print (_min);
 }
 
-/*
-void checkButton() {
-  byte buttonCurrent = analogRead(BTN_PIN) / 4;
-  if (buttonCurrent > 250)
-    buttonPrev = buttonCurrent;
-  //NONE = 255, SELECT = 160, LEFT = 103, DOWN = 64, UP = 25, RIGHT = 0
-  else if (buttonCurrent < 250 && buttonPrev > 250) {
-    buttonTime = millis();
-    buttonPrev = buttonCurrent;
-    if (buttonCurrent > 155 && buttonCurrent < 165)
-      buttonAction = SELECT;
-    else if (buttonCurrent > 98 && buttonCurrent < 108)
-      buttonAction = LEFT;
-    else if (buttonCurrent > 59 && buttonCurrent < 69)
-      buttonAction = DOWN;
-    else if (buttonCurrent > 20 && buttonCurrent < 30)
-      buttonAction = UP;
-    else if (buttonCurrent < 5)
-      buttonAction = RIGHT;
-  }
+void swapOutputs () {
+  byte _temp = out1pin;
+  out1pin = out2pin;
+  out2pin = _temp;
 }
-*/
