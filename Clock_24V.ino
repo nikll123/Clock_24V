@@ -33,7 +33,6 @@ byte out2pin = 17;     //A3
 byte clock_h = 0;
 byte clock_m = 0;
 unsigned long millisPrev = 1000;    // таймер секунд
-byte buttonPrev = 255;
 unsigned long buttonTime = 0;
 byte buttonAction = NONE;
 
@@ -44,7 +43,6 @@ void setup() {
     time.hours = 0;
 
   I2C_lcdStart();
-  //  lcd.begin (16, 2);
 
   pinMode (out1pin, OUTPUT);
   pinMode (out2pin, OUTPUT);
@@ -71,16 +69,12 @@ void loop() {
     time.gettime();
   }
 
-  if (checkPowerVoltage(VOLT_PIN) ) {
+  if (powerGood(VOLT_PIN) ) {
     if (timeNotMatch() ) {
       digitalWrite (LED_BUILTIN, LOW);
       clock_m ++;
-      if (clock_m == 60) {
-        clock_m = 0;
-        clock_h ++;
-        if (clock_h == 12)
-          clock_h = 0;
-      }
+      formatTime();
+      
       EEPROM.put (MIN_ADD, clock_m);
       EEPROM.put (HOUR_ADD, clock_h);
       clockSwitch (clock_m);
@@ -109,7 +103,7 @@ bool timeNotMatch() {
   return (time.hours != clock_h || time.minutes != clock_m);
 }
 
-bool checkPowerVoltage(byte _pin) {
+bool powerGood(byte _pin) {
   byte voltage = (map ( (analogRead (_pin) / 4), 0, 255, 0, 24) );
   return (voltage > MIN_CLOCK_VOLTAGE);
 }
@@ -124,6 +118,15 @@ void print_main_screen() {
   lcd.print ("Module");
   lcd.setCursor (0, 1);
   lcd.print ("Clock");
+}
+
+void formatTime() {
+  if (clock_m == 60) {
+    clock_m = 0;
+    clock_h ++;
+    if (clock_h == 12)
+      clock_h = 0;
+  }
 }
 
 void print_time (byte _symb, byte _line, byte _hour, byte _min) {
