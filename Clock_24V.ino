@@ -10,13 +10,30 @@
 #define HOUR_ADD 0  //1 byte
 #define MIN_ADD 1   //1 byte
 
+#define BTN_LEFT 0
+#define BTN_SELECT 1
+#define BTN_RIGHT 2
+
+
 #define MIN_CLOCK_VOLTAGE 19    //Minimum voltage required for stable clock work
 
 //значения клавиш
-#define NONE 0
-#define SELECT 1
-#define LEFT 2
-#define RIGHT 3
+enum buttons {
+  NONE,
+  SELECT,
+  LEFT,
+  RIGHT
+};
+
+enum menu {
+  MAIN,
+  SET_DATE,
+  SET_TIME,
+  SET_ARROWS,
+  ENTER_DATE,
+  ENTER_TIME,
+  ENTER_ARROWS_TIME,
+};
 
 #define BTN1_PIN 14  //A0
 #define BTN2_PIN 15  //A1
@@ -34,7 +51,7 @@ byte out1pin = 16;     //A2
 byte out2pin = 17;     //A3
 byte clock_h = 0;
 byte clock_m = 0;
-unsigned long millisPrev = 1000;    // seconds timer
+unsigned long millisPrev = 1000;                               // seconds timer
 unsigned long buttonTime = 0;
 byte buttonAction = NONE;
 
@@ -108,6 +125,10 @@ bool timeNotMatch() {
 bool powerGood(byte _pin) {
   byte voltage = (map ( (analogRead (_pin) / 4), 0, 255, 0, 24) );
   return (voltage > MIN_CLOCK_VOLTAGE);
+}
+
+byte checkButton (bool _btn) {
+  bool btn1state = !digitalRead (_btn);
 }
 
 void I2C_lcdStart() {
