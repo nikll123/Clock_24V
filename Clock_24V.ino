@@ -1,21 +1,25 @@
-/* Программа управления настенными часами, предназначенными для работы с часовым сервером на основе модуля DS1302 и подобным*/
-// Теперь не читаем время с модуля каждую секунду. При запуске читаем время, далее работа по внутреннему таймеру
+/* Master program for old factory 24v clocks, using positive polarity impulse to switch even minutes
+ *  and negative polarity impulse for other minutes.
+ Works with real time modules DS1302, DS1307 or DS3231*/
+ 
 // Присоединён дисплей, сделан вывод времени на дисплей
 // в процессе менюшка с переводом времени
+
 #include <EEPROM.h>
 #include <iarduino_RTC.h>
 //#include <LiquidCrystal.h>
 #include <LiquidCrystal_I2C.h>
 
-#define HOUR_ADD 0  //1 byte
-#define MIN_ADD 1   //1 byte
+#define BTN_RIGHT_PIN 14   //A0
+#define BTN_LEFT_PIN 15    //A1
+#define BTN_SELECT_PIN 16  //A2
+#define VOLT_PIN A1        //sensor pin for power voltage control
 
-#define BTN_LEFT 0
-#define BTN_SELECT 1
-#define BTN_RIGHT 2
-
+#define HOUR_ADD 0  //address in EEPROM for saving previous hour arrow position, 1 byte
+#define MIN_ADD 1   //address in EEPROM for saving previous minute arrow position, 1 byte
 #define MIN_CLOCK_VOLTAGE 19    //Minimum voltage required for stable clock work
 #define BTN_IGNORE_TIME 80      //Time to ignore button bounce
+#define MENU_WAIT_TIME 20000    //Time from last button action to return to main screen
 
 struct Btn {
   byte pin;
@@ -31,31 +35,24 @@ struct Btn {
     if (front)
       pressMillis = millis();
   };
+  bool pressed() {
+    return (currentState && prevState);
+  }
 };
 
-//button meanings
-enum buttons {
-  NONE,
-  SELECT,
-  LEFT,
-  RIGHT
-};
-
-enum menu {
+enum Menu {
   MAIN,
   SET_DATE,
   SET_TIME,
-  SET_ARROWS,
   ENTER_DATE,
   ENTER_TIME,
   ENTER_ARROWS_TIME,
 };
 
-#define BTN1_PIN 14  //A0
-#define BTN2_PIN 15  //A1
-#define BTN3_PIN 16  //A2
-
-#define VOLT_PIN A1                                            //sensor pin for power voltage control
+struct Disp {
+  bool needRefresh;
+  Menu menu;
+};
 
 //iarduino_RTC time (RTC_DS1302, 0, 1, 2);                     //RST, CLK, DAT
 //iarduino_RTC time (RTC_DS1307);                              //using I2C
@@ -63,23 +60,18 @@ iarduino_RTC time (RTC_DS3231);                                //using I2C
 //LiquidCrystal lcd (8, 9, 4, 5, 6, 7);                        //for display shield: RS, E, D4, D5, D6, D7, R/W = GND
 LiquidCrystal_I2C lcd(0x3f, 16, 2);                            //Set address 0x3f, display 16 symbols and 2 lines (16х2)
 
+//Menu menu = MAIN;
 byte out1pin = 16;     //A2
 byte out2pin = 17;     //A3
 byte clock_h = 0;
 byte clock_m = 0;
-Btn btnRight = {0, 0, 0, 0, 0, 0};
-Btn btnLeft = {0, 0, 0, 0, 0, 0};
-Btn btnSelect = {0, 0, 0, 0, 0, 0};
 
-
+Btn btnRight = {BTN_RIGHT_PIN, 0, 0, 0, 0, 0};
+Btn btnLeft = {BTN_LEFT_PIN, 0, 0, 0, 0, 0};
+Btn btnSelect = {BTN_SELECT_PIN, 0, 0, 0, 0, 0};
+Disp disp = {true, MAIN};
 
 void setup() {
-  delay (40);
-  btnLeft.check();
-  btnRight.check();
-  if (btnRight.front && btnLeft.front) {
-    
-  }
   time.begin();
   time.gettime();
   if (time.hours == 12)
@@ -89,27 +81,34 @@ void setup() {
 
   pinMode (out1pin, OUTPUT);
   pinMode (out2pin, OUTPUT);
-  pinMode (BTN1_PIN, INPUT);
-  pinMode (BTN2_PIN, INPUT);
-  pinMode (BTN3_PIN, INPUT);
+  pinMode (BTN_RIGHT_PIN, INPUT_PULLUP);
+  pinMode (BTN_LEFT_PIN, INPUT_PULLUP);
+  pinMode (BTN_SELECT_PIN, INPUT_PULLUP);
   pinMode (VOLT_PIN, INPUT);
   pinMode (LED_BUILTIN, OUTPUT);
   if (EEPROM.get (HOUR_ADD, clock_h) == 255) {
-    EEPROM.put (HOUR_ADD, 4);
-    EEPROM.put (MIN_ADD, 37);
+    disp.menu = ENTER_ARROWS_TIME;
+    clock_h = 0;
+    clock_m = 0;
   }
-  clock_h = EEPROM.get (HOUR_ADD, clock_h);
-  clock_m = EEPROM.get (MIN_ADD, clock_m);
-
-  print_main_screen();                            // "Module, clock"
-  print_time (7, 0, time.hours, time.minutes);
-  print_time (6, 1, clock_h, clock_m);
+  else {
+    clock_h = EEPROM.get (HOUR_ADD, clock_h);
+    clock_m = EEPROM.get (MIN_ADD, clock_m);
+  }
 }
 
 void loop() {
-  if (millis() >= millisPrev) {
-    millisPrev += 1000;
+  if (disp.needRefresh)
+    dispRefresh(disp.menu);
+  btnLeft.check();
+  btnRight.check();
+  btnSelect.check();
+  
+  if (millis() % 1000 == 0) {         //update time from RTC module
     time.gettime();
+    if (time.hours == 12)
+      time.hours = 0;
+    dispPrintTime (8, 0, time.hours, time.minutes);
   }
 
   if (powerGood(VOLT_PIN) ) {
@@ -120,11 +119,44 @@ void loop() {
       
       EEPROM.put (MIN_ADD, clock_m);
       EEPROM.put (HOUR_ADD, clock_h);
-      clockSwitch (clock_m);
+      clockSwitch (clock_m);    //turn on out > delay > turn off out > delay
     }
   }
   else
     digitalWrite (LED_BUILTIN, HIGH);
+}
+//---------end of loop()
+
+
+void dispRefresh (byte _menu) {
+  switch (_menu) {
+    case MAIN:
+      lcd.setCursor (0, 0);
+      lcd.print ("Module:");
+      lcd.setCursor (0, 1);
+      lcd.print ("Clock: ");
+      dispPrintTime (8, 0, time.hours, time.minutes);
+      dispPrintTime (8, 1, clock_h, clock_m);
+      break;
+    case SET_DATE:
+      break;
+    case SET_TIME:
+      break;
+    case ENTER_ARROWS_TIME:
+      break;
+  }
+  disp.needRefresh = false;
+}
+
+void dispPrintTime (byte _symbol, byte _line, byte _hour, byte _minute) {
+  lcd.setCursor (_symbol, _line);
+  if (_hour < 10)
+    lcd.print ("0");
+  lcd.print (_hour);
+  lcd.print (":");
+  if (_minute < 10)
+    lcd.print ("0");
+  lcd.print (_minute);
 }
 
 void clockSwitch (byte minutes) {
@@ -151,10 +183,6 @@ bool powerGood(byte _pin) {
   return (voltage > MIN_CLOCK_VOLTAGE);
 }
 
-byte checkButton (bool _btn) {
-  bool btnState = !digitalRead (_btn);
-}
-
 void I2C_lcdStart() {
   lcd.init();                     // инициализация LCD
   lcd.backlight();                // включаем подсветку
@@ -167,7 +195,7 @@ void print_main_screen() {
   lcd.print ("Clock");
 }
 
-void formatTime() {
+void formatTime() {   //resets minutes if minutes == 60 and resets hours if hours == 12
   if (clock_m == 60) {
     clock_m = 0;
     clock_h ++;
