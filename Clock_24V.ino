@@ -14,10 +14,26 @@
 #define BTN_SELECT 1
 #define BTN_RIGHT 2
 
-
 #define MIN_CLOCK_VOLTAGE 19    //Minimum voltage required for stable clock work
+#define BTN_IGNORE_TIME 80      //Time to ignore button bounce
 
-//значения клавиш
+struct Btn {
+  byte pin;
+  bool currentState;
+  bool prevState;
+  unsigned long pressMillis;
+  byte time;
+  bool front;
+  void check() {
+    currentState = !digitalRead (pin);
+    unsigned long currentMillis = millis();
+    front = (currentState && !prevState && (currentMillis > (millis() + BTN_IGNORE_TIME) ) );
+    if (front)
+      pressMillis = millis();
+  };
+};
+
+//button meanings
 enum buttons {
   NONE,
   SELECT,
@@ -51,11 +67,19 @@ byte out1pin = 16;     //A2
 byte out2pin = 17;     //A3
 byte clock_h = 0;
 byte clock_m = 0;
-unsigned long millisPrev = 1000;                               // seconds timer
-unsigned long buttonTime = 0;
-byte buttonAction = NONE;
+Btn btnRight = {0, 0, 0, 0, 0, 0};
+Btn btnLeft = {0, 0, 0, 0, 0, 0};
+Btn btnSelect = {0, 0, 0, 0, 0, 0};
+
+
 
 void setup() {
+  delay (40);
+  btnLeft.check();
+  btnRight.check();
+  if (btnRight.front && btnLeft.front) {
+    
+  }
   time.begin();
   time.gettime();
   if (time.hours == 12)
@@ -128,7 +152,7 @@ bool powerGood(byte _pin) {
 }
 
 byte checkButton (bool _btn) {
-  bool btn1state = !digitalRead (_btn);
+  bool btnState = !digitalRead (_btn);
 }
 
 void I2C_lcdStart() {
