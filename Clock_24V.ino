@@ -42,16 +42,22 @@ struct Btn {
 
 enum Menu {
   MAIN,
-  SET_DATE,
   SET_TIME,
-  ENTER_DATE,
+  SET_DATE,
   ENTER_TIME,
+  ENTER_DATE,
   ENTER_ARROWS_TIME,
+  SYNCHRO_MODE,
+  ADJUST_VOLTAGE_PROBE,
+  BACK_TO_MAIN,
 };
 
 struct Disp {
   bool needRefresh;
   Menu menu;
+  Menu menuPrev;
+  bool blinkEnable;
+  byte blinkSymbol;
 };
 
 //iarduino_RTC time (RTC_DS1302, 0, 1, 2);                     //RST, CLK, DAT
@@ -69,7 +75,7 @@ byte clock_m = 0;
 Btn btnRight = {BTN_RIGHT_PIN, 0, 0, 0, 0, 0};
 Btn btnLeft = {BTN_LEFT_PIN, 0, 0, 0, 0, 0};
 Btn btnSelect = {BTN_SELECT_PIN, 0, 0, 0, 0, 0};
-Disp disp = {true, MAIN};
+Disp disp = {true, MAIN, MAIN, false, 0};
 
 void setup() {
   time.begin();
@@ -98,22 +104,31 @@ void setup() {
 }
 
 void loop() {
-  if (disp.needRefresh)
-    dispRefresh(disp.menu);
   btnLeft.check();
   btnRight.check();
   btnSelect.check();
+
+//  switch (btnLeft.
+  //----------add button actions
+  if (disp.needRefresh) {
+    dispRefresh();
+  }
   
   if (millis() % 1000 == 0) {         //update time from RTC module
     time.gettime();
     if (time.hours == 12)
       time.hours = 0;
-    dispPrintTime (8, 0, time.hours, time.minutes);
+    if (disp.menu == MAIN) {
+      dispPrintTime (8, 0, time.hours, time.minutes);
+      dispPrintSeconds (13, 0, time.seconds);
+    }
   }
 
-  if (powerGood(VOLT_PIN) ) {
-    if (timeNotMatch() ) {
+  if (powerGood(VOLT_PIN) ) {   //turn off LED
       digitalWrite (LED_BUILTIN, LOW);
+    if (timeNotMatch() ) {   // disp.refresh = true, clock.m++, formatTime, EEPROM.put, clock.switch
+      if (disp.menu == MAIN)
+        dispPrintTime (8, 0, time.hours, time.minutes);
       clock_m ++;
       formatTime();
       
@@ -128,21 +143,28 @@ void loop() {
 //---------end of loop()
 
 
-void dispRefresh (byte _menu) {
-  switch (_menu) {
+void dispRefresh () {
+  if (disp.menu != disp.menuPrev) {
+    lcd.clear();
+    lcd.setCursor (0, 0);
+  }
+  switch (disp.menu) {
     case MAIN:
-      lcd.setCursor (0, 0);
       lcd.print ("Module:");
       lcd.setCursor (0, 1);
       lcd.print ("Clock: ");
       dispPrintTime (8, 0, time.hours, time.minutes);
       dispPrintTime (8, 1, clock_h, clock_m);
       break;
-    case SET_DATE:
-      break;
     case SET_TIME:
       break;
+    case SET_DATE:
+      lcd.print ("Set date");
+      break;
     case ENTER_ARROWS_TIME:
+      lcd.print ("Enter");
+      lcd.setCursor (0, 1);
+      lcd.print ("arrows position");
       break;
   }
   disp.needRefresh = false;
@@ -159,13 +181,20 @@ void dispPrintTime (byte _symbol, byte _line, byte _hour, byte _minute) {
   lcd.print (_minute);
 }
 
-void clockSwitch (byte minutes) {
+void dispPrintSeconds (byte _symbol, byte _line, byte _seconds) {
+  lcd.setCursor (_symbol, _line);
+  if (_seconds < 10)
+    lcd.print ("0");
+  lcd.print (_seconds);
+}
+
+void clockSwitch (byte minutes) {   //add display output of current position at avery switch
   byte _pin;
   if (minutes % 2 == 0)
     _pin = out1pin;
   else
     _pin = out2pin;
-
+  //--------add display output here
   digitalWrite (_pin, HIGH);
   digitalWrite (LED_BUILTIN, HIGH);
   delay (100);
@@ -195,7 +224,7 @@ void print_main_screen() {
   lcd.print ("Clock");
 }
 
-void formatTime() {   //resets minutes if minutes == 60 and resets hours if hours == 12
+void formatTime() {   //resets clock minutes if minutes == 60 and resets clock hours if hours == 12
   if (clock_m == 60) {
     clock_m = 0;
     clock_h ++;
