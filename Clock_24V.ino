@@ -13,7 +13,7 @@
 #define BTN_RIGHT_PIN 14   //A0
 #define BTN_LEFT_PIN 15    //A1
 #define BTN_SELECT_PIN 16  //A2
-#define VOLT_PIN A1        //sensor pin for power voltage control
+#define VOLT_PIN A1        //sensor pin for 24V power voltage control
 
 #define HOUR_ADD 0  //address in EEPROM for saving previous hour arrow position, 1 byte
 #define MIN_ADD 1   //address in EEPROM for saving previous minute arrow position, 1 byte
@@ -31,9 +31,11 @@ struct Btn {
   void check() {
     currentState = !digitalRead (pin);
     unsigned long currentMillis = millis();
+    if (currentMillis > (pressMillis + BTN_IGNORE_TIME) ) {
     front = (currentState && !prevState && (currentMillis > (millis() + BTN_IGNORE_TIME) ) );
     if (front)
       pressMillis = millis();
+    }
   };
   bool pressed() {
     return (currentState && prevState);
@@ -46,9 +48,10 @@ enum Menu {
   SET_DATE,
   ENTER_TIME,
   ENTER_DATE,
-  ENTER_ARROWS_TIME,
+  ENTER_ARROWS_POSITION,
   SYNCHRO_MODE,
   ADJUST_VOLTAGE_PROBE,
+  WORK,
   BACK_TO_MAIN,
 };
 
@@ -66,7 +69,8 @@ iarduino_RTC time (RTC_DS3231);                                //using I2C
 //LiquidCrystal lcd (8, 9, 4, 5, 6, 7);                        //for display shield: RS, E, D4, D5, D6, D7, R/W = GND
 LiquidCrystal_I2C lcd(0x3f, 16, 2);                            //Set address 0x3f, display 16 symbols and 2 lines (16х2)
 
-//Menu menu = MAIN;
+bool work = true;
+bool synchronizeNow = true;
 byte out1pin = 16;     //A2
 byte out2pin = 17;     //A3
 byte clock_h = 0;
@@ -92,8 +96,9 @@ void setup() {
   pinMode (BTN_SELECT_PIN, INPUT_PULLUP);
   pinMode (VOLT_PIN, INPUT);
   pinMode (LED_BUILTIN, OUTPUT);
-  if (EEPROM.get (HOUR_ADD, clock_h) == 255) {
-    disp.menu = ENTER_ARROWS_TIME;
+  if (EEPROM.get (HOUR_ADD, clock_h) == 255) {  // menu = enter arrows position
+    disp.menu = ENTER_ARROWS_POSITION;
+    work = false;
     clock_h = 0;
     clock_m = 0;
   }
@@ -101,6 +106,10 @@ void setup() {
     clock_h = EEPROM.get (HOUR_ADD, clock_h);
     clock_m = EEPROM.get (MIN_ADD, clock_m);
   }
+  btnRight.check();
+  btnLeft.check();
+  if (btnRight.currentState && btnLeft.currentState)
+    work = false;
 }
 
 void loop() {
@@ -108,7 +117,10 @@ void loop() {
   btnRight.check();
   btnSelect.check();
 
-//  switch (btnLeft.
+  if (btnLeft.front || btnRight.front || btnSelect.front) {
+    
+  }
+
   //----------add button actions
   if (disp.needRefresh) {
     dispRefresh();
@@ -124,7 +136,7 @@ void loop() {
     }
   }
 
-  if (powerGood(VOLT_PIN) ) {   //turn off LED
+  if (powerGood() && work) {   //turn off LED
       digitalWrite (LED_BUILTIN, LOW);
     if (timeNotMatch() ) {   // disp.refresh = true, clock.m++, formatTime, EEPROM.put, clock.switch
       if (disp.menu == MAIN)
@@ -144,28 +156,39 @@ void loop() {
 
 
 void dispRefresh () {
-  if (disp.menu != disp.menuPrev) {
-    lcd.clear();
-    lcd.setCursor (0, 0);
-  }
+  lcd.clear();
+  lcd.setCursor (0, 0);
+  lcd.noBlink();
   switch (disp.menu) {
-    case MAIN:
+    case MAIN: {
       lcd.print ("Module:");
       lcd.setCursor (0, 1);
       lcd.print ("Clock: ");
       dispPrintTime (8, 0, time.hours, time.minutes);
-      dispPrintTime (8, 1, clock_h, clock_m);
-      break;
-    case SET_TIME:
-      break;
-    case SET_DATE:
+      lcd.print (":");
+      dispPrintSeconds (14, 0, time.seconds);
+      dispPrintTime (7, 1, clock_h, clock_m);
+      lcd.setCursor (13, 1);
+      if (work)
+        lcd.print ("On ");
+      else
+        lcd.print ("Off");
+    }
+    break;
+    case SET_TIME: {
+      lcd.print ("Set time");
+    }
+    break;
+    case SET_DATE: {
       lcd.print ("Set date");
-      break;
-    case ENTER_ARROWS_TIME:
+    }
+    break;
+    case ENTER_ARROWS_POSITION: {
       lcd.print ("Enter");
       lcd.setCursor (0, 1);
       lcd.print ("arrows position");
-      break;
+    }
+    break;
   }
   disp.needRefresh = false;
 }
@@ -207,21 +230,14 @@ bool timeNotMatch() {
   return (time.hours != clock_h || time.minutes != clock_m);
 }
 
-bool powerGood(byte _pin) {
-  byte voltage = (map ( (analogRead (_pin) / 4), 0, 255, 0, 24) );
+bool powerGood() {
+  byte voltage = (map ( (analogRead (VOLT_PIN) / 4), 0, 255, 0, 24) );
   return (voltage > MIN_CLOCK_VOLTAGE);
 }
 
 void I2C_lcdStart() {
   lcd.init();                     // инициализация LCD
   lcd.backlight();                // включаем подсветку
-}
-
-void print_main_screen() {
-  lcd.setCursor (0, 0);
-  lcd.print ("Module");
-  lcd.setCursor (0, 1);
-  lcd.print ("Clock");
 }
 
 void formatTime() {   //resets clock minutes if minutes == 60 and resets clock hours if hours == 12
