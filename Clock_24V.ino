@@ -249,17 +249,6 @@ void formatTime() {   //resets clock minutes if minutes == 60 and resets clock h
   }
 }
 
-void print_time (byte _symb, byte _line, byte _hour, byte _min) {
-  lcd.setCursor (_symb, _line);
-  if (_hour < 10)
-    lcd.print ("0");
-  lcd.print (_hour);
-  lcd.print (":");
-  if (_min < 10)
-    lcd.print ("0");
-  lcd.print (_min);
-}
-
 void swapOutputs () {
   byte _temp = out1pin;
   out1pin = out2pin;
