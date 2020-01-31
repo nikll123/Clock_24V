@@ -18,7 +18,7 @@
 #define HOUR_ADD 0  //address in EEPROM for saving previous hour arrow position, 1 byte
 #define MIN_ADD 1   //address in EEPROM for saving previous minute arrow position, 1 byte
 #define MIN_CLOCK_VOLTAGE 19    //Minimum voltage required for stable clock work
-#define BTN_IGNORE_TIME 80      //Time to ignore button bounce
+#define BTN_IGNORE_TIME 30      //Time to ignore button bounce
 #define MENU_WAIT_TIME 20000    //Time from last button action to return to main screen
 
 struct Btn {
@@ -36,6 +36,9 @@ struct Btn {
     if (front)
       pressMillis = millis();
     }
+    else if (currentState && prevState) {
+      front = false;
+    };
   };
   bool pressed() {
     return (currentState && prevState);
@@ -45,9 +48,10 @@ struct Btn {
 enum Menu {
   MAIN,
   SET_TIME,
-  SET_DATE,
   ENTER_TIME,
+  SET_DATE,
   ENTER_DATE,
+  SET_ARROWS_POSITION,
   ENTER_ARROWS_POSITION,
   SYNCHRO_MODE,
   ADJUST_VOLTAGE_PROBE,
@@ -183,8 +187,8 @@ void dispRefresh () {
       lcd.print ("Set date");
     }
     break;
-    case ENTER_ARROWS_POSITION: {
-      lcd.print ("Enter");
+    case SET_ARROWS_POSITION: {
+      lcd.print ("Set");
       lcd.setCursor (0, 1);
       lcd.print ("arrows position");
     }
