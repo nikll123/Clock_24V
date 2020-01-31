@@ -23,25 +23,27 @@
 
 struct Btn {
   byte pin;
-  bool currentState;
-  bool prevState;
+  bool isPressed;
+  bool wasPressed;
   unsigned long pressMillis;
   byte time;
   bool front;
   void check() {
-    currentState = !digitalRead (pin);
+    isPressed = !digitalRead (pin);
     unsigned long currentMillis = millis();
     if (currentMillis > (pressMillis + BTN_IGNORE_TIME) ) {
-    front = (currentState && !prevState && (currentMillis > (millis() + BTN_IGNORE_TIME) ) );
-    if (front)
-      pressMillis = millis();
+      
+//разобраться:------------------
+      front = (isPressed && !wasPressed && (currentMillis > (millis() + BTN_IGNORE_TIME) ) );
+      if (front)
+        pressMillis = millis();
     }
-    else if (currentState && prevState) {
+    else if (isPressed && wasPressed) {
       front = false;
     };
   };
   bool pressed() {
-    return (currentState && prevState);
+    return (isPressed && wasPressed);
   }
 };
 
@@ -112,7 +114,7 @@ void setup() {
   }
   btnRight.check();
   btnLeft.check();
-  if (btnRight.currentState && btnLeft.currentState)
+  if (btnRight.isPressed && btnLeft.isPressed)
     work = false;
 }
 
