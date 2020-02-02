@@ -1,6 +1,6 @@
 /* Master program for old factory 24v clocks, using positive polarity impulse to switch even minutes
- * and negative polarity impulse for other minutes.
- * Works with real time modules DS1302, DS1307 or DS3231*/
+   and negative polarity impulse for other minutes.
+   Works with real time modules DS1302, DS1307 or DS3231*/
 
 #include <EEPROM.h>
 #include <iarduino_RTC.h>
@@ -24,29 +24,52 @@ struct Btn {
   bool wasPressed;
   unsigned long pressMillis;    //Moment, when the button was pressed
   unsigned long currentMillis;
-//  byte time;
+  //  byte time;
   bool front;
-  void check() {
-    isPressed = !digitalRead (pin);
-    currentMillis = millis();
-    if (currentMillis > (pressMillis + BTN_IGNORE_TIME) ) {
-      if (isPressed && !wasPressed) {
-        front = true;
-        pressMillis = currentMillis;
-        wasPressed = isPressed;
+  /*  void check() {
+      isPressed = !digitalRead (pin);
+      currentMillis = millis();
+      if (currentMillis > (pressMillis + BTN_IGNORE_TIME) ) {
+        if (isPressed && !wasPressed) {
+          front = true;
+          pressMillis = currentMillis;
+          wasPressed = isPressed;
+        }
+        else if (!isPressed && wasPressed) {
+          wasPressed = isPressed;
+        }
       }
-      else if (!isPressed && wasPressed) {
-        wasPressed = isPressed;
+      else {
+        front = false;
+      }
+    };*/
+  bool prevState;
+  int countStateLast;
+  int countStateToSwitch;
+  
+  void check() {
+    bool curState = !digitalRead (pin);
+    if (isPressed != curState && curState == prevState){
+      countStateLast++;
+      if (countStateLast >= countStateToSwitch) {
+        isPressed = curState;
       }
     }
     else {
-      front = false;
+      countStateLast = 0;
     }
-  };
-  bool pressed() {
+    prevState = curState;
+  }
+
+/*  is not used
+ *   bool pressed() {
     return (isPressed && wasPressed);
-  };
+  };*/
 };
+
+Btn btnRight = Btn{BTN_RIGHT_PIN};
+Btn btnLeft =  {BTN_LEFT_PIN};
+Btn btnSelect = {BTN_SELECT_PIN};
 
 enum Menu {
   MAIN,
@@ -84,9 +107,6 @@ byte out2pin = 17;     //A3
 byte clock_h = 0;
 byte clock_m = 0;
 
-Btn btnRight = {BTN_RIGHT_PIN};
-Btn btnLeft = {BTN_LEFT_PIN};
-Btn btnSelect = {BTN_SELECT_PIN};
 Disp disp = {true};
 
 void setup() {
@@ -126,14 +146,14 @@ void loop() {
   btnSelect.check();
 
   if (btnLeft.front || btnRight.front || btnSelect.front) {
-    
+
   }
 
   //----------add button actions
   if (disp.needRefresh) {
     dispRefresh();
   }
-  
+
   if (millis() % 1000 == 0) {         //update time from RTC module
     time.gettime();
     if (time.hours == 12)
@@ -145,13 +165,13 @@ void loop() {
   }
 
   if (powerGood() && work) {   //turn off LED
-      digitalWrite (LED_BUILTIN, LOW);
+    digitalWrite (LED_BUILTIN, LOW);
     if (timeNotMatch() ) {   // disp.refresh = true, clock.m++, formatTime, EEPROM.put, clock.switch
       if (disp.menu == MAIN)
         dispPrintTime (8, 0, time.hours, time.minutes);
       clock_m ++;
       formatTime();
-      
+
       EEPROM.put (MIN_ADD, clock_m);
       EEPROM.put (HOUR_ADD, clock_h);
       clockSwitch (clock_m);    //turn on out > delay > turn off out > delay
@@ -169,34 +189,34 @@ void dispRefresh () {
   lcd.noBlink();
   switch (disp.menu) {
     case MAIN: {
-      lcd.print ("Module:");
-      lcd.setCursor (0, 1);
-      lcd.print ("Clock: ");
-      dispPrintTime (8, 0, time.hours, time.minutes);
-      lcd.print (":");
-      dispPrintSeconds (14, 0, time.seconds);
-      dispPrintTime (7, 1, clock_h, clock_m);
-      lcd.setCursor (13, 1);
-      if (work)
-        lcd.print ("On ");
-      else
-        lcd.print ("Off");
-    }
-    break;
+        lcd.print ("Module:");
+        lcd.setCursor (0, 1);
+        lcd.print ("Clock: ");
+        dispPrintTime (8, 0, time.hours, time.minutes);
+        lcd.print (":");
+        dispPrintSeconds (14, 0, time.seconds);
+        dispPrintTime (7, 1, clock_h, clock_m);
+        lcd.setCursor (13, 1);
+        if (work)
+          lcd.print ("On ");
+        else
+          lcd.print ("Off");
+      }
+      break;
     case SET_TIME: {
-      lcd.print ("Set time");
-    }
-    break;
+        lcd.print ("Set time");
+      }
+      break;
     case SET_DATE: {
-      lcd.print ("Set date");
-    }
-    break;
+        lcd.print ("Set date");
+      }
+      break;
     case SET_ARROWS_POSITION: {
-      lcd.print ("Set");
-      lcd.setCursor (0, 1);
-      lcd.print ("arrows position");
-    }
-    break;
+        lcd.print ("Set");
+        lcd.setCursor (0, 1);
+        lcd.print ("arrows position");
+      }
+      break;
   }
   disp.needRefresh = false;
 }
