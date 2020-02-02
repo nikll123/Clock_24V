@@ -1,9 +1,6 @@
 /* Master program for old factory 24v clocks, using positive polarity impulse to switch even minutes
- *  and negative polarity impulse for other minutes.
- Works with real time modules DS1302, DS1307 or DS3231*/
- 
-// Присоединён дисплей, сделан вывод времени на дисплей
-// в процессе менюшка с переводом времени
+ * and negative polarity impulse for other minutes.
+ * Works with real time modules DS1302, DS1307 or DS3231*/
 
 #include <EEPROM.h>
 #include <iarduino_RTC.h>
@@ -15,8 +12,8 @@
 #define BTN_SELECT_PIN 16  //A2
 #define VOLT_PIN A1        //sensor pin for 24V power voltage control
 
-#define HOUR_ADD 0  //address in EEPROM for saving previous hour arrow position, 1 byte
-#define MIN_ADD 1   //address in EEPROM for saving previous minute arrow position, 1 byte
+#define HOUR_ADD 0              //address in EEPROM for saving previous hour arrow position, 1 byte
+#define MIN_ADD 1               //address in EEPROM for saving previous minute arrow position, 1 byte
 #define MIN_CLOCK_VOLTAGE 19    //Minimum voltage required for stable clock work
 #define BTN_IGNORE_TIME 30      //Time to ignore button bounce
 #define MENU_WAIT_TIME 20000    //Time from last button action to return to main screen
@@ -25,26 +22,30 @@ struct Btn {
   byte pin;
   bool isPressed;
   bool wasPressed;
-  unsigned long pressMillis;
-  byte time;
+  unsigned long pressMillis;    //Moment, when the button was pressed
+  unsigned long currentMillis;
+//  byte time;
   bool front;
   void check() {
     isPressed = !digitalRead (pin);
-    unsigned long currentMillis = millis();
+    currentMillis = millis();
     if (currentMillis > (pressMillis + BTN_IGNORE_TIME) ) {
-      
-//разобраться:------------------
-      front = (isPressed && !wasPressed && (currentMillis > (millis() + BTN_IGNORE_TIME) ) );
-      if (front)
-        pressMillis = millis();
+      if (isPressed && !wasPressed) {
+        front = true;
+        pressMillis = currentMillis;
+        wasPressed = isPressed;
+      }
+      else if (!isPressed && wasPressed) {
+        wasPressed = isPressed;
+      }
     }
-    else if (isPressed && wasPressed) {
+    else {
       front = false;
-    };
+    }
   };
   bool pressed() {
     return (isPressed && wasPressed);
-  }
+  };
 };
 
 enum Menu {
@@ -61,12 +62,13 @@ enum Menu {
   BACK_TO_MAIN,
 };
 
-struct Disp {
+struct Disp { //
   bool needRefresh;
   Menu menu;
   Menu menuPrev;
   bool blinkEnable;
   byte blinkSymbol;
+  byte blinkLine;
 };
 
 //iarduino_RTC time (RTC_DS1302, 0, 1, 2);                     //RST, CLK, DAT
@@ -82,10 +84,10 @@ byte out2pin = 17;     //A3
 byte clock_h = 0;
 byte clock_m = 0;
 
-Btn btnRight = {BTN_RIGHT_PIN, 0, 0, 0, 0, 0};
-Btn btnLeft = {BTN_LEFT_PIN, 0, 0, 0, 0, 0};
-Btn btnSelect = {BTN_SELECT_PIN, 0, 0, 0, 0, 0};
-Disp disp = {true, MAIN, MAIN, false, 0};
+Btn btnRight = {BTN_RIGHT_PIN};
+Btn btnLeft = {BTN_LEFT_PIN};
+Btn btnSelect = {BTN_SELECT_PIN};
+Disp disp = {true};
 
 void setup() {
   time.begin();
