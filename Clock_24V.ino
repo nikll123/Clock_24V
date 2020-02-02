@@ -1,6 +1,6 @@
 /* Master program for old factory 24v clocks, using positive polarity impulse to switch even minutes
-   and negative polarity impulse for other minutes.
-   Works with real time modules DS1302, DS1307 or DS3231*/
+ * and negative polarity impulse for other minutes.
+ * Works with real time modules DS1302, DS1307 or DS3231*/
 
 #include <EEPROM.h>
 #include <iarduino_RTC.h>
